@@ -28,12 +28,6 @@
             z-index: 100;
         }
 
-        .logo {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
-
         .logo h2 {
             color: #333;
             font-size: 1.5rem;
@@ -111,13 +105,6 @@
         .header h1 {
             color: #333;
             font-size: 24px;
-        }
-
-        .header h1 span {
-            color: #667eea;
-            font-size: 14px;
-            margin-left: 10px;
-            font-weight: normal;
         }
 
         .refresh-btn {
@@ -225,10 +212,6 @@
             cursor: pointer;
         }
 
-        .email-item:last-child {
-            border-bottom: none;
-        }
-
         .email-item:hover {
             background: #f8f9fa;
         }
@@ -236,10 +219,6 @@
         .email-item.unread {
             background: #f0f7ff;
             font-weight: 500;
-        }
-
-        .email-item.unread .email-from {
-            font-weight: 600;
         }
 
         .email-summary {
@@ -275,7 +254,6 @@
             color: #666;
             font-size: 0.9rem;
             padding: 0 1.2rem 1rem 1.2rem;
-            border-left: 3px solid transparent;
         }
 
         .email-detail {
@@ -312,26 +290,6 @@
             border-radius: 10px;
             margin-bottom: 1rem;
             text-align: center;
-            border-left: 4px solid #c62828;
-        }
-
-        .badge {
-            display: inline-block;
-            padding: 3px 8px;
-            border-radius: 12px;
-            font-size: 11px;
-            font-weight: 500;
-            margin-left: 8px;
-        }
-
-        .badge.inbox {
-            background: #e3f2fd;
-            color: #1976d2;
-        }
-
-        .badge.sent {
-            background: #e8f5e9;
-            color: #388e3c;
         }
 
         @media (max-width: 768px) {
@@ -386,10 +344,7 @@
 
     <div class="container">
         <div class="header">
-            <h1>
-                Inbox
-                <span>recent emails</span>
-            </h1>
+            <h1>Your Inbox</h1>
             <button class="refresh-btn" onclick="loadEmails()" id="refreshBtn">
                 <span class="spinner"></span>
                 <span class="btn-text">🔄 Refresh</span>
@@ -422,8 +377,6 @@
     </div>
 
     <script>
-        let currentEmails = [];
-
         async function loadEmails() {
             const refreshBtn = document.getElementById('refreshBtn');
             const loading = document.getElementById('loading');
@@ -446,7 +399,6 @@
                     throw new Error(data.error || 'Failed to load emails');
                 }
 
-                currentEmails = data;
                 displayEmails(data);
                 updateStats(data);
             } catch (error) {
@@ -532,7 +484,6 @@
         function toggleEmail(index, element) {
             element.classList.toggle('expanded');
             
-            // Close other expanded emails
             const allEmails = document.querySelectorAll('.email-item');
             allEmails.forEach((email, i) => {
                 if (i !== index && email.classList.contains('expanded')) {
@@ -569,7 +520,6 @@
             }
         }
 
-        // Load emails automatically when page loads
         document.addEventListener('DOMContentLoaded', loadEmails);
     </script>
 </body>
