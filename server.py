@@ -1,4 +1,4 @@
-        import os
+import os
 import base64
 import json
 from flask import Flask, redirect, url_for, session, render_template, request, jsonify
@@ -19,7 +19,7 @@ app.config['SESSION_COOKIE_HTTPONLY'] = True
 app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
 Session(app)
 
-# Replace these with your actual values:
+# Google OAuth Configuration - YOUR ACTUAL CREDENTIALS
 CLIENT_ID = "733557611631-tvn1a5fovr1u990glo6jbvjnkr67c2sn.apps.googleusercontent.com"
 CLIENT_SECRET = "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"
 PROJECT_ID = "newporoject-c6f66"
