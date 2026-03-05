@@ -19,10 +19,10 @@ app.config['SESSION_COOKIE_HTTPONLY'] = True
 app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
 Session(app)
 
-# Google OAuth Configuration - Direct values (you'll put your actual credentials here)
-CLIENT_ID = "YOUR_GOOGLE_CLIENT_ID"  # Replace with your actual Client ID
-CLIENT_SECRET = "YOUR_GOOGLE_CLIENT_SECRET"  # Replace with your actual Client Secret
-PROJECT_ID = "YOUR_GOOGLE_PROJECT_ID"  # Replace with your actual Project ID
+# Replace these with your actual values:
+CLIENT_ID = "733557611631-tvn1a5fovr1u990glo6jbvjnkr67c2sn.apps.googleusercontent.com"
+CLIENT_SECRET = "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"
+PROJECT_ID = "newporoject-c6f66"
 
 # Get the base URL from environment or use default for local
 BASE_URL = os.environ.get('RENDER_EXTERNAL_URL', 'http://localhost:5000')
