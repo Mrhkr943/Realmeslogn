@@ -1,4 +1,4 @@
-import os
+        import os
 import base64
 import json
 from flask import Flask, redirect, url_for, session, render_template, request, jsonify
@@ -7,24 +7,26 @@ from google_auth_oauthlib.flow import Flow
 from google.oauth2.credentials import Credentials
 from google.auth.transport.requests import Request
 from googleapiclient.discovery import build
-from dotenv import load_dotenv
 import functools
 
-# Load environment variables
-load_dotenv()
-
 app = Flask(__name__)
-app.secret_key = os.getenv('FLASK_SECRET_KEY', os.urandom(24).hex())
+app.secret_key = os.urandom(24).hex()
 app.config['SESSION_TYPE'] = 'filesystem'
 app.config['SESSION_PERMANENT'] = False
 app.config['SESSION_USE_SIGNER'] = True
+app.config['SESSION_COOKIE_SECURE'] = True
+app.config['SESSION_COOKIE_HTTPONLY'] = True
+app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
 Session(app)
 
-# OAuth 2.0 Configuration from environment variables
-CLIENT_ID = os.getenv('GOOGLE_CLIENT_ID')
-CLIENT_SECRET = os.getenv('GOOGLE_CLIENT_SECRET')
-PROJECT_ID = os.getenv('GOOGLE_PROJECT_ID')
-REDIRECT_URI = os.getenv('REDIRECT_URI', 'http://localhost:5000/callback')
+# Google OAuth Configuration - Direct values (you'll put your actual credentials here)
+CLIENT_ID = "YOUR_GOOGLE_CLIENT_ID"  # Replace with your actual Client ID
+CLIENT_SECRET = "YOUR_GOOGLE_CLIENT_SECRET"  # Replace with your actual Client Secret
+PROJECT_ID = "YOUR_GOOGLE_PROJECT_ID"  # Replace with your actual Project ID
+
+# Get the base URL from environment or use default for local
+BASE_URL = os.environ.get('RENDER_EXTERNAL_URL', 'http://localhost:5000')
+REDIRECT_URI = f"{BASE_URL}/callback"
 
 SCOPES = [
     'openid',
@@ -33,7 +35,7 @@ SCOPES = [
     'https://www.googleapis.com/auth/gmail.readonly'
 ]
 
-# Create client config dynamically
+# Create client config
 client_config = {
     "web": {
         "client_id": CLIENT_ID,
@@ -120,7 +122,6 @@ def dashboard():
 @login_required
 def get_emails():
     try:
-        # Load credentials from session
         creds_dict = session['credentials']
         credentials = Credentials(
             token=creds_dict['token'],
@@ -131,16 +132,12 @@ def get_emails():
             scopes=creds_dict['scopes']
         )
         
-        # Refresh token if expired
         if credentials.expired and credentials.refresh_token:
             credentials.refresh(Request())
-            # Update session with new token
             session['credentials']['token'] = credentials.token
         
-        # Build Gmail service
         service = build('gmail', 'v1', credentials=credentials)
         
-        # Get list of messages
         results = service.users().messages().list(
             userId='me', 
             maxResults=20,
@@ -157,13 +154,11 @@ def get_emails():
                 format='full'
             ).execute()
             
-            # Extract headers
             headers = msg['payload']['headers']
             subject = next((h['value'] for h in headers if h['name'] == 'Subject'), 'No Subject')
             from_email = next((h['value'] for h in headers if h['name'] == 'From'), 'Unknown')
             date = next((h['value'] for h in headers if h['name'] == 'Date'), 'Unknown')
             
-            # Get message body
             body = extract_message_body(msg)
             body_preview = body[:200] + '...' if len(body) > 200 else body
             
@@ -184,7 +179,6 @@ def get_emails():
         return jsonify({'error': str(e)}), 500
 
 def extract_message_body(msg):
-    """Extract message body from Gmail message"""
     try:
         if 'parts' in msg['payload']:
             for part in msg['payload']['parts']:
@@ -203,27 +197,6 @@ def extract_message_body(msg):
         pass
     return ''
 
-@app.route('/api/email/<message_id>')
-@login_required
-def get_email_detail(message_id):
-    try:
-        creds_dict = session['credentials']
-        credentials = Credentials(**creds_dict)
-        
-        service = build('gmail', 'v1', credentials=credentials)
-        msg = service.users().messages().get(
-            userId='me', 
-            id=message_id,
-            format='full'
-        ).execute()
-        
-        return jsonify({
-            'id': message_id,
-            'full_body': extract_message_body(msg)
-        })
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
-
 @app.route('/logout')
 def logout():
     session.clear()
@@ -234,4 +207,5 @@ def health():
     return jsonify({'status': 'healthy'}), 200
 
 if __name__ == '__main__':
-    app.run(debug=True, port=5000)
+    port = int(os.environ.get('PORT', 5000))
+    app.run(host='0.0.0.0', port=port, debug=False)
