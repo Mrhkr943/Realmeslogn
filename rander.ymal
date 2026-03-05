@@ -6,4 +6,5 @@ services:
     startCommand: gunicorn server:app
     envVars:
       - key: RENDER_EXTERNAL_URL
-        value: https://your-app-name.onrender.com
+        value: https://gmailx.onrender.com
+
