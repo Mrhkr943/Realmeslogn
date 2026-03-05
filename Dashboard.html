@@ -1,0 +1,576 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Email Dashboard - {{ email }}</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            background: #f0f2f5;
+        }
+
+        .navbar {
+            background: white;
+            padding: 0.8rem 2rem;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .logo h2 {
+            color: #333;
+            font-size: 1.5rem;
+        }
+
+        .user-info {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+        }
+
+        .user-details {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .user-avatar {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            font-size: 18px;
+        }
+
+        .user-avatar img {
+            width: 100%;
+            height: 100%;
+            border-radius: 50%;
+            object-fit: cover;
+        }
+
+        .user-email {
+            color: #666;
+            font-size: 14px;
+        }
+
+        .logout-btn {
+            background: #f44336;
+            color: white;
+            padding: 8px 20px;
+            border-radius: 20px;
+            text-decoration: none;
+            font-size: 14px;
+            font-weight: 500;
+            transition: background 0.3s;
+        }
+
+        .logout-btn:hover {
+            background: #d32f2f;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 2rem auto;
+            padding: 0 1rem;
+        }
+
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 2rem;
+            background: white;
+            padding: 1.5rem;
+            border-radius: 10px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+        }
+
+        .header h1 {
+            color: #333;
+            font-size: 24px;
+        }
+
+        .header h1 span {
+            color: #667eea;
+            font-size: 14px;
+            margin-left: 10px;
+            font-weight: normal;
+        }
+
+        .refresh-btn {
+            background: #4CAF50;
+            color: white;
+            border: none;
+            padding: 12px 25px;
+            border-radius: 25px;
+            cursor: pointer;
+            font-size: 1rem;
+            font-weight: 500;
+            transition: all 0.3s;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .refresh-btn:hover:not(:disabled) {
+            background: #45a049;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(76, 175, 80, 0.3);
+        }
+
+        .refresh-btn:disabled {
+            background: #cccccc;
+            cursor: not-allowed;
+            opacity: 0.7;
+        }
+
+        .refresh-btn .spinner {
+            display: none;
+            width: 16px;
+            height: 16px;
+            border: 2px solid #ffffff;
+            border-top: 2px solid transparent;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        .refresh-btn.loading .spinner {
+            display: inline-block;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .stats-bar {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 1rem;
+            margin-bottom: 2rem;
+        }
+
+        .stat-card {
+            background: white;
+            padding: 1.2rem;
+            border-radius: 10px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+            text-align: center;
+        }
+
+        .stat-value {
+            font-size: 28px;
+            font-weight: bold;
+            color: #667eea;
+            margin-bottom: 5px;
+        }
+
+        .stat-label {
+            color: #666;
+            font-size: 14px;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 4rem;
+            color: #666;
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+        }
+
+        .loading .spinner-large {
+            width: 50px;
+            height: 50px;
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #667eea;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px;
+        }
+
+        .email-list {
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+            overflow: hidden;
+        }
+
+        .email-item {
+            border-bottom: 1px solid #e0e0e0;
+            transition: background 0.3s;
+            cursor: pointer;
+        }
+
+        .email-item:last-child {
+            border-bottom: none;
+        }
+
+        .email-item:hover {
+            background: #f8f9fa;
+        }
+
+        .email-item.unread {
+            background: #f0f7ff;
+            font-weight: 500;
+        }
+
+        .email-item.unread .email-from {
+            font-weight: 600;
+        }
+
+        .email-summary {
+            padding: 1.2rem;
+            display: grid;
+            grid-template-columns: 200px 1fr 150px;
+            gap: 1rem;
+            align-items: center;
+        }
+
+        .email-from {
+            color: #333;
+            font-weight: 500;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .email-subject {
+            color: #444;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .email-date {
+            color: #999;
+            font-size: 0.9rem;
+            text-align: right;
+        }
+
+        .email-snippet {
+            color: #666;
+            font-size: 0.9rem;
+            padding: 0 1.2rem 1rem 1.2rem;
+            border-left: 3px solid transparent;
+        }
+
+        .email-detail {
+            padding: 1.2rem;
+            background: #f9f9f9;
+            border-top: 1px solid #e0e0e0;
+            display: none;
+            line-height: 1.6;
+            white-space: pre-wrap;
+            font-size: 0.95rem;
+            color: #333;
+        }
+
+        .email-item.expanded .email-detail {
+            display: block;
+        }
+
+        .email-item.expanded .email-snippet {
+            display: none;
+        }
+
+        .no-emails {
+            text-align: center;
+            padding: 4rem;
+            color: #666;
+            background: white;
+            border-radius: 10px;
+        }
+
+        .error-message {
+            background: #ffebee;
+            color: #c62828;
+            padding: 1rem;
+            border-radius: 10px;
+            margin-bottom: 1rem;
+            text-align: center;
+            border-left: 4px solid #c62828;
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 3px 8px;
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: 500;
+            margin-left: 8px;
+        }
+
+        .badge.inbox {
+            background: #e3f2fd;
+            color: #1976d2;
+        }
+
+        .badge.sent {
+            background: #e8f5e9;
+            color: #388e3c;
+        }
+
+        @media (max-width: 768px) {
+            .email-summary {
+                grid-template-columns: 1fr;
+                gap: 0.5rem;
+            }
+            
+            .email-date {
+                text-align: left;
+            }
+            
+            .stats-bar {
+                grid-template-columns: 1fr;
+            }
+            
+            .navbar {
+                flex-direction: column;
+                gap: 1rem;
+                padding: 1rem;
+            }
+            
+            .user-info {
+                width: 100%;
+                justify-content: space-between;
+            }
+        }
+    </style>
+</head>
+<body>
+    <nav class="navbar">
+        <div class="logo">
+            <h2>📧 Email Dashboard</h2>
+        </div>
+        <div class="user-info">
+            <div class="user-details">
+                <div class="user-avatar">
+                    {% if picture %}
+                    <img src="{{ picture }}" alt="{{ name }}">
+                    {% else %}
+                    {{ name[0]|upper }}
+                    {% endif %}
+                </div>
+                <div>
+                    <div style="font-weight: 500;">{{ name }}</div>
+                    <div class="user-email">{{ email }}</div>
+                </div>
+            </div>
+            <a href="/logout" class="logout-btn">Logout</a>
+        </div>
+    </nav>
+
+    <div class="container">
+        <div class="header">
+            <h1>
+                Inbox
+                <span>recent emails</span>
+            </h1>
+            <button class="refresh-btn" onclick="loadEmails()" id="refreshBtn">
+                <span class="spinner"></span>
+                <span class="btn-text">🔄 Refresh</span>
+            </button>
+        </div>
+
+        <div class="stats-bar" id="stats" style="display: none;">
+            <div class="stat-card">
+                <div class="stat-value" id="total-emails">0</div>
+                <div class="stat-label">Total Emails</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="unread-count">0</div>
+                <div class="stat-label">Unread</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="categories">-</div>
+                <div class="stat-label">Categories</div>
+            </div>
+        </div>
+
+        <div id="error-container"></div>
+        
+        <div id="loading" class="loading" style="display: none;">
+            <div class="spinner-large"></div>
+            <p>Loading your emails...</p>
+        </div>
+
+        <div id="email-container"></div>
+    </div>
+
+    <script>
+        let currentEmails = [];
+
+        async function loadEmails() {
+            const refreshBtn = document.getElementById('refreshBtn');
+            const loading = document.getElementById('loading');
+            const emailContainer = document.getElementById('email-container');
+            const errorContainer = document.getElementById('error-container');
+            const stats = document.getElementById('stats');
+
+            refreshBtn.classList.add('loading');
+            refreshBtn.disabled = true;
+            loading.style.display = 'block';
+            emailContainer.style.display = 'none';
+            stats.style.display = 'none';
+            errorContainer.innerHTML = '';
+
+            try {
+                const response = await fetch('/api/get_emails');
+                const data = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(data.error || 'Failed to load emails');
+                }
+
+                currentEmails = data;
+                displayEmails(data);
+                updateStats(data);
+            } catch (error) {
+                errorContainer.innerHTML = `
+                    <div class="error-message">
+                        <strong>Error:</strong> ${error.message}
+                    </div>
+                `;
+                emailContainer.innerHTML = '<div class="no-emails">📧 No emails to display. Click refresh to try again.</div>';
+                emailContainer.style.display = 'block';
+            } finally {
+                refreshBtn.classList.remove('loading');
+                refreshBtn.disabled = false;
+                loading.style.display = 'none';
+            }
+        }
+
+        function updateStats(emails) {
+            const stats = document.getElementById('stats');
+            if (emails.length === 0) {
+                stats.style.display = 'none';
+                return;
+            }
+
+            document.getElementById('total-emails').textContent = emails.length;
+            
+            const unreadCount = emails.filter(e => e.labelIds && e.labelIds.includes('UNREAD')).length;
+            document.getElementById('unread-count').textContent = unreadCount;
+            
+            const categories = new Set();
+            emails.forEach(e => {
+                if (e.labelIds) {
+                    e.labelIds.forEach(label => {
+                        if (['INBOX', 'SENT', 'IMPORTANT'].includes(label)) {
+                            categories.add(label);
+                        }
+                    });
+                }
+            });
+            document.getElementById('categories').textContent = categories.size || '—';
+            
+            stats.style.display = 'grid';
+        }
+
+        function displayEmails(emails) {
+            const emailContainer = document.getElementById('email-container');
+            
+            if (emails.length === 0) {
+                emailContainer.innerHTML = '<div class="no-emails">📭 No emails found in your inbox</div>';
+                return;
+            }
+
+            let html = '<div class="email-list">';
+            emails.forEach((email, index) => {
+                const isUnread = email.labelIds && email.labelIds.includes('UNREAD');
+                const unreadClass = isUnread ? 'unread' : '';
+                
+                html += `
+                    <div class="email-item ${unreadClass}" onclick="toggleEmail(${index}, this)">
+                        <div class="email-summary">
+                            <div class="email-from">${escapeHtml(email.from)}</div>
+                            <div class="email-subject">${escapeHtml(email.subject)}</div>
+                            <div class="email-date">${formatDate(email.date)}</div>
+                        </div>
+                        <div class="email-snippet">
+                            ${escapeHtml(email.snippet)}
+                        </div>
+                        <div class="email-detail">
+                            <strong>From:</strong> ${escapeHtml(email.from)}<br>
+                            <strong>Subject:</strong> ${escapeHtml(email.subject)}<br>
+                            <strong>Date:</strong> ${escapeHtml(email.date)}<br><br>
+                            ${escapeHtml(email.body || 'No content available')}
+                        </div>
+                    </div>
+                `;
+            });
+            html += '</div>';
+            
+            emailContainer.innerHTML = html;
+            emailContainer.style.display = 'block';
+        }
+
+        function toggleEmail(index, element) {
+            element.classList.toggle('expanded');
+            
+            // Close other expanded emails
+            const allEmails = document.querySelectorAll('.email-item');
+            allEmails.forEach((email, i) => {
+                if (i !== index && email.classList.contains('expanded')) {
+                    email.classList.remove('expanded');
+                }
+            });
+        }
+
+        function escapeHtml(text) {
+            if (!text) return '';
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        function formatDate(dateString) {
+            try {
+                const date = new Date(dateString);
+                const now = new Date();
+                const diffTime = Math.abs(now - date);
+                const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                
+                if (diffDays === 0) {
+                    return 'Today, ' + date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+                } else if (diffDays === 1) {
+                    return 'Yesterday';
+                } else if (diffDays < 7) {
+                    return date.toLocaleDateString('en-US', { weekday: 'short' });
+                } else {
+                    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+                }
+            } catch {
+                return dateString;
+            }
+        }
+
+        // Load emails automatically when page loads
+        document.addEventListener('DOMContentLoaded', loadEmails);
+    </script>
+</body>
+</html>
