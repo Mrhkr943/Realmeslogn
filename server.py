@@ -28,8 +28,11 @@ SCOPES = [
 def terms():
     return render_template('terms.html')
 @app.route('/dashboard')
-def privacy():
-    return render_template('dashboard.html')
+def dashboard():
+    if 'credentials' not in session:
+        return redirect('/')
+    return render_template('dashboard.html', email=session.get('email'))
+
 @app.route('/privacy')
 def privacy():
     return render_template('privacy.html')
