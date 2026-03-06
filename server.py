@@ -9,7 +9,7 @@ from google.auth.transport.requests import Request
 from googleapiclient.discovery import build
 import functools
 
-app = Flask(__name__)
+app = Flask(__name__, template_folder='.')
 app.secret_key = os.urandom(24).hex()
 app.config['SESSION_TYPE'] = 'filesystem'
 app.config['SESSION_PERMANENT'] = False
