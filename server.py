@@ -5,17 +5,15 @@ from google_auth_oauthlib.flow import Flow
 from google.oauth2.credentials import Credentials
 from google.auth.transport.requests import Request
 from googleapiclient.discovery import build
-import functools
 
 app = Flask(__name__, template_folder='.')
-app.secret_key = "my-super-secret-key-12345-change-this"  # Change this in production
+app.secret_key = "my-super-secret-key-12345"
 
 # Google Credentials
 CLIENT_ID = "733557611631-tvn1a5fovr1u990glo6jbvjnkr67c2sn.apps.googleusercontent.com"
 CLIENT_SECRET = "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"
 PROJECT_ID = "newporoject-c6f66"
 
-# URL Configuration
 BASE_URL = os.environ.get('RENDER_EXTERNAL_URL', 'https://gmailx.onrender.com')
 REDIRECT_URI = f"{BASE_URL}/callback"
 
@@ -26,13 +24,7 @@ SCOPES = [
     'https://www.googleapis.com/auth/gmail.readonly'
 ]
 
-def login_required(f):
-    @functools.wraps(f)
-    def decorated_function(*args, **kwargs):
-        if 'credentials' not in session:
-            return redirect('/')
-        return f(*args, **kwargs)
-    return decorated_function
+# ----- SIMPLE ROUTES - IN THE RIGHT ORDER -----
 
 @app.route('/')
 def index():
@@ -45,6 +37,16 @@ def privacy():
 @app.route('/terms')
 def terms():
     return render_template('terms.html')
+
+@app.route('/dashboard')
+def dashboard():
+    # Check if user is logged in
+    if 'credentials' not in session:
+        return redirect('/')
+    # Pass email to template
+    return render_template('dashboard.html', email=session.get('email'))
+
+# ----- AUTHENTICATION ROUTES -----
 
 @app.route('/login')
 def login():
@@ -108,7 +110,7 @@ def callback():
             'scopes': creds.scopes
         }
         
-        # Get user info
+        # Get user email
         service = build('oauth2', 'v2', credentials=creds)
         user = service.userinfo().get().execute()
         session['email'] = user['email']
@@ -118,14 +120,13 @@ def callback():
     except Exception as e:
         return f"Callback Error: {str(e)}", 400
 
-@app.route('/dashboard')
-@login_required
-def dashboard():
-    return render_template('dashboard.html', email=session.get('email'))
+# ----- API ROUTE -----
 
 @app.route('/api/emails')
-@login_required
 def get_emails():
+    if 'credentials' not in session:
+        return jsonify({'error': 'Not logged in'}), 401
+    
     try:
         creds_dict = session['credentials']
         creds = Credentials(
