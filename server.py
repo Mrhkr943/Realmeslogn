@@ -1,6 +1,7 @@
 import os
 import base64
 import json
+import logging
 from flask import Flask, redirect, url_for, session, render_template, request, jsonify
 from flask_session import Session
 from google_auth_oauthlib.flow import Flow
@@ -9,14 +10,19 @@ from google.auth.transport.requests import Request
 from googleapiclient.discovery import build
 import functools
 
+# Set up logging
+logging.basicConfig(level=logging.DEBUG)
+logger = logging.getLogger(__name__)
+
 app = Flask(__name__, template_folder='.')
-app.secret_key = os.urandom(24).hex()
+app.secret_key = os.environ.get('SECRET_KEY', os.urandom(24).hex())
 app.config['SESSION_TYPE'] = 'filesystem'
 app.config['SESSION_PERMANENT'] = False
 app.config['SESSION_USE_SIGNER'] = True
 app.config['SESSION_COOKIE_SECURE'] = True
 app.config['SESSION_COOKIE_HTTPONLY'] = True
 app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
+app.config['DEBUG'] = True
 Session(app)
 
 # Google OAuth Configuration - YOUR ACTUAL CREDENTIALS
@@ -52,11 +58,13 @@ def login_required(f):
     @functools.wraps(f)
     def decorated_function(*args, **kwargs):
         if 'credentials' not in session:
+            logger.debug("Login required but no credentials in session")
             return redirect(url_for('index'))
         return f(*args, **kwargs)
     return decorated_function
 
 def get_flow():
+    logger.debug(f"Creating OAuth flow with redirect URI: {REDIRECT_URI}")
     flow = Flow.from_client_config(
         client_config,
         scopes=SCOPES,
@@ -66,26 +74,52 @@ def get_flow():
 
 @app.route('/')
 def index():
-    return render_template('google.html')
+    logger.debug("Rendering index page")
+    try:
+        # Check if google.html exists
+        template_path = os.path.join(app.root_path, 'google.html')
+        logger.debug(f"Looking for template at: {template_path}")
+        if os.path.exists(template_path):
+            logger.debug("google.html found")
+        else:
+            logger.error("google.html NOT found!")
+            return "Error: google.html not found in the current directory", 500
+        return render_template('google.html')
+    except Exception as e:
+        logger.error(f"Error rendering index: {str(e)}")
+        return f"Error loading page: {str(e)}", 500
 
 @app.route('/login')
 def login():
-    flow = get_flow()
-    authorization_url, state = flow.authorization_url(
-        access_type='offline',
-        include_granted_scopes='true',
-        prompt='consent'
-    )
-    session['state'] = state
-    return redirect(authorization_url)
+    logger.debug("Login route accessed")
+    try:
+        flow = get_flow()
+        authorization_url, state = flow.authorization_url(
+            access_type='offline',
+            include_granted_scopes='true',
+            prompt='consent'
+        )
+        session['state'] = state
+        logger.debug(f"Generated auth URL: {authorization_url}")
+        logger.debug(f"State saved: {state}")
+        return redirect(authorization_url)
+    except Exception as e:
+        logger.error(f"Error in login route: {str(e)}")
+        return f"Login error: {str(e)}", 500
 
 @app.route('/callback')
 def callback():
+    logger.debug("Callback route accessed")
     try:
         flow = get_flow()
         flow.fetch_token(authorization_response=request.url)
         
-        if 'state' not in session or session['state'] != request.args.get('state'):
+        if 'state' not in session:
+            logger.error("No state in session")
+            return 'State mismatch error: No state in session', 400
+            
+        if session['state'] != request.args.get('state'):
+            logger.error(f"State mismatch: session={session['state']}, request={request.args.get('state')}")
             return 'State mismatch error', 400
         
         credentials = flow.credentials
@@ -97,6 +131,7 @@ def callback():
             'client_secret': credentials.client_secret,
             'scopes': credentials.scopes
         }
+        logger.debug("Credentials saved to session")
         
         # Get user email
         service = build('oauth2', 'v2', credentials=credentials)
@@ -104,23 +139,39 @@ def callback():
         session['email'] = user_info['email']
         session['name'] = user_info.get('name', 'User')
         session['picture'] = user_info.get('picture', '')
+        logger.debug(f"User info saved: {session['email']}")
         
         return redirect(url_for('dashboard'))
     
     except Exception as e:
+        logger.error(f"Error in callback route: {str(e)}")
         return f"Authentication error: {str(e)}", 400
 
 @app.route('/dashboard')
 @login_required
 def dashboard():
-    return render_template('dashboard.html', 
-                         email=session.get('email'),
-                         name=session.get('name'),
-                         picture=session.get('picture'))
+    logger.debug("Dashboard route accessed")
+    try:
+        template_path = os.path.join(app.root_path, 'dashboard.html')
+        logger.debug(f"Looking for dashboard template at: {template_path}")
+        if os.path.exists(template_path):
+            logger.debug("dashboard.html found")
+        else:
+            logger.error("dashboard.html NOT found!")
+            return "Error: dashboard.html not found", 500
+            
+        return render_template('dashboard.html', 
+                             email=session.get('email'),
+                             name=session.get('name'),
+                             picture=session.get('picture'))
+    except Exception as e:
+        logger.error(f"Error rendering dashboard: {str(e)}")
+        return f"Dashboard error: {str(e)}", 500
 
 @app.route('/api/get_emails')
 @login_required
 def get_emails():
+    logger.debug("API get_emails route accessed")
     try:
         creds_dict = session['credentials']
         credentials = Credentials(
@@ -133,6 +184,7 @@ def get_emails():
         )
         
         if credentials.expired and credentials.refresh_token:
+            logger.debug("Refreshing expired token")
             credentials.refresh(Request())
             session['credentials']['token'] = credentials.token
         
@@ -145,6 +197,7 @@ def get_emails():
         ).execute()
         
         messages = results.get('messages', [])
+        logger.debug(f"Found {len(messages)} messages")
         
         emails = []
         for message in messages:
@@ -176,6 +229,7 @@ def get_emails():
         return jsonify(emails)
     
     except Exception as e:
+        logger.error(f"Error in get_emails: {str(e)}")
         return jsonify({'error': str(e)}), 500
 
 def extract_message_body(msg):
@@ -193,12 +247,13 @@ def extract_message_body(msg):
             return base64.urlsafe_b64decode(
                 msg['payload']['body']['data']
             ).decode('utf-8', errors='ignore')
-    except:
-        pass
+    except Exception as e:
+        logger.error(f"Error extracting message body: {str(e)}")
     return ''
 
 @app.route('/logout')
 def logout():
+    logger.debug("Logout route accessed")
     session.clear()
     return redirect(url_for('index'))
 
@@ -206,6 +261,21 @@ def logout():
 def health():
     return jsonify({'status': 'healthy'}), 200
 
+@app.route('/debug')
+def debug():
+    """Debug route to check file structure"""
+    try:
+        files = os.listdir(app.root_path)
+        return jsonify({
+            'root_path': app.root_path,
+            'files': files,
+            'google_html_exists': 'google.html' in files,
+            'dashboard_html_exists': 'dashboard.html' in files,
+            'session_keys': list(session.keys()) if session else []
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
-    app.run(host='0.0.0.0', port=port, debug=False)
+    app.run(host='0.0.0.0', port=port, debug=True)
