@@ -1,31 +1,21 @@
 import os
 import base64
-import json
-from flask import Flask, redirect, url_for, session, render_template, request, jsonify
-from flask_session import Session
+from flask import Flask, redirect, session, render_template, request, jsonify
 from google_auth_oauthlib.flow import Flow
 from google.oauth2.credentials import Credentials
 from google.auth.transport.requests import Request
 from googleapiclient.discovery import build
-import functools
 
 app = Flask(__name__, template_folder='.')
-app.secret_key = os.environ.get('SECRET_KEY', 'dev-secret-key-change-in-production')
-app.config['SESSION_TYPE'] = 'filesystem'
-app.config['SESSION_PERMANENT'] = False
-app.config['SESSION_USE_SIGNER'] = True
-app.config['SESSION_COOKIE_SECURE'] = True
-app.config['SESSION_COOKIE_HTTPONLY'] = True
-app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
-Session(app)
+app.secret_key = "my-super-secret-key-12345"  # Simple fixed key
 
-# Google OAuth Configuration
+# Your Google Credentials
 CLIENT_ID = "733557611631-tvn1a5fovr1u990glo6jbvjnkr67c2sn.apps.googleusercontent.com"
 CLIENT_SECRET = "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"
 PROJECT_ID = "newporoject-c6f66"
 
-# Get the base URL
-BASE_URL = os.environ.get('RENDER_EXTERNAL_URL', 'http://localhost:5000')
+# Get the correct URL
+BASE_URL = os.environ.get('RENDER_EXTERNAL_URL', 'https://gmailx.onrender.com')
 REDIRECT_URI = f"{BASE_URL}/callback"
 
 SCOPES = [
@@ -35,28 +25,6 @@ SCOPES = [
     'https://www.googleapis.com/auth/gmail.readonly'
 ]
 
-def login_required(f):
-    @functools.wraps(f)
-    def decorated_function(*args, **kwargs):
-        if 'credentials' not in session:
-            return redirect(url_for('index'))
-        return f(*args, **kwargs)
-    return decorated_function
-
-def get_flow():
-    client_config = {
-        "web": {
-            "client_id": CLIENT_ID,
-            "project_id": PROJECT_ID,
-            "auth_uri": "https://accounts.google.com/o/oauth2/auth",
-            "token_uri": "https://oauth2.googleapis.com/token",
-            "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
-            "client_secret": CLIENT_SECRET,
-            "redirect_uris": [REDIRECT_URI]
-        }
-    }
-    return Flow.from_client_config(client_config, scopes=SCOPES, redirect_uri=REDIRECT_URI)
-
 @app.route('/')
 def index():
     return render_template('google.html')
@@ -64,62 +32,94 @@ def index():
 @app.route('/login')
 def login():
     try:
-        flow = get_flow()
-        authorization_url, state = flow.authorization_url(
+        # Create flow directly
+        flow = Flow.from_client_config(
+            {
+                "web": {
+                    "client_id": CLIENT_ID,
+                    "project_id": PROJECT_ID,
+                    "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+                    "token_uri": "https://oauth2.googleapis.com/token",
+                    "client_secret": CLIENT_SECRET,
+                    "redirect_uris": [REDIRECT_URI]
+                }
+            },
+            scopes=SCOPES,
+            redirect_uri=REDIRECT_URI
+        )
+        
+        # Generate authorization URL
+        auth_url, state = flow.authorization_url(
             access_type='offline',
-            include_granted_scopes='true',
             prompt='consent'
         )
+        
+        # Store state in session
         session['state'] = state
-        return redirect(authorization_url)
+        
+        # Redirect to Google
+        return redirect(auth_url)
+        
     except Exception as e:
-        return f"Login error: {str(e)}", 500
+        return f"Login Error: {str(e)}", 500
 
 @app.route('/callback')
 def callback():
     try:
-        flow = get_flow()
+        # Create flow again
+        flow = Flow.from_client_config(
+            {
+                "web": {
+                    "client_id": CLIENT_ID,
+                    "project_id": PROJECT_ID,
+                    "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+                    "token_uri": "https://oauth2.googleapis.com/token",
+                    "client_secret": CLIENT_SECRET,
+                    "redirect_uris": [REDIRECT_URI]
+                }
+            },
+            scopes=SCOPES,
+            redirect_uri=REDIRECT_URI
+        )
+        
+        # Get token
         flow.fetch_token(authorization_response=request.url)
         
-        if session.get('state') != request.args.get('state'):
-            return 'State mismatch error', 400
-        
-        credentials = flow.credentials
+        # Store credentials
+        creds = flow.credentials
         session['credentials'] = {
-            'token': credentials.token,
-            'refresh_token': credentials.refresh_token,
-            'token_uri': credentials.token_uri,
-            'client_id': credentials.client_id,
-            'client_secret': credentials.client_secret,
-            'scopes': credentials.scopes
+            'token': creds.token,
+            'refresh_token': creds.refresh_token,
+            'token_uri': creds.token_uri,
+            'client_id': creds.client_id,
+            'client_secret': creds.client_secret,
+            'scopes': creds.scopes
         }
         
-        # Get user info
-        service = build('oauth2', 'v2', credentials=credentials)
-        user_info = service.userinfo().get().execute()
-        session['email'] = user_info['email']
-        session['name'] = user_info.get('name', 'User')
-        session['picture'] = user_info.get('picture', '')
+        # Get user email
+        service = build('oauth2', 'v2', credentials=creds)
+        user = service.userinfo().get().execute()
+        session['email'] = user['email']
         
-        return redirect(url_for('dashboard'))
-    
+        return redirect('/dashboard')
+        
     except Exception as e:
-        return f"Callback error: {str(e)}", 400
+        return f"Callback Error: {str(e)}", 400
 
 @app.route('/dashboard')
-@login_required
 def dashboard():
-    return render_template('dashboard.html', 
-                         email=session.get('email'),
-                         name=session.get('name'),
-                         picture=session.get('picture'))
+    if 'credentials' not in session:
+        return redirect('/')
+    return render_template('dashboard.html', email=session.get('email'))
 
-@app.route('/api/get_emails')
-@login_required
+@app.route('/api/emails')
 def get_emails():
+    if 'credentials' not in session:
+        return jsonify({'error': 'Not logged in'}), 401
+    
     try:
         creds_dict = session['credentials']
-        credentials = Credentials(
+        creds = Credentials(
             token=creds_dict['token'],
             refresh_token=creds_dict.get('refresh_token'),
             token_uri=creds_dict['token_uri'],
@@ -128,36 +128,40 @@ def get_emails():
             scopes=creds_dict['scopes']
         )
         
-        if credentials.expired and credentials.refresh_token:
-            credentials.refresh(Request())
-            session['credentials']['token'] = credentials.token
+        # Refresh if expired
+        if creds.expired:
+            creds.refresh(Request())
+            session['credentials']['token'] = creds.token
         
-        service = build('gmail', 'v1', credentials=credentials)
-        results = service.users().messages().list(userId='me', maxResults=20).execute()
-        messages = results.get('messages', [])
+        # Get emails
+        service = build('gmail', 'v1', credentials=creds)
+        results = service.users().messages().list(userId='me', maxResults=10).execute()
         
         emails = []
-        for message in messages:
-            msg = service.users().messages().get(userId='me', id=message['id'], format='metadata').execute()
-            headers = msg['payload']['headers']
+        for msg in results.get('messages', []):
+            msg_data = service.users().messages().get(userId='me', id=msg['id']).execute()
+            headers = msg_data['payload']['headers']
+            
+            subject = next((h['value'] for h in headers if h['name'] == 'Subject'), 'No Subject')
+            from_email = next((h['value'] for h in headers if h['name'] == 'From'), 'Unknown')
+            date = next((h['value'] for h in headers if h['name'] == 'Date'), 'Unknown')
             
             emails.append({
-                'id': message['id'],
-                'subject': next((h['value'] for h in headers if h['name'] == 'Subject'), 'No Subject'),
-                'from': next((h['value'] for h in headers if h['name'] == 'From'), 'Unknown'),
-                'date': next((h['value'] for h in headers if h['name'] == 'Date'), 'Unknown'),
-                'snippet': msg['snippet'],
+                'subject': subject,
+                'from': from_email,
+                'date': date,
+                'snippet': msg_data['snippet']
             })
         
         return jsonify(emails)
-    
+        
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
 @app.route('/logout')
 def logout():
     session.clear()
-    return redirect(url_for('index'))
+    return redirect('/')
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
