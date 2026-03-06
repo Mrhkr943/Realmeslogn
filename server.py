@@ -24,6 +24,9 @@ SCOPES = [
     'https://www.googleapis.com/auth/userinfo.profile',
     'https://www.googleapis.com/auth/gmail.readonly'
 ]
+@app.route('/terms')
+def terms():
+    return render_template('terms.html')
 @app.route('/dashboard')
 def privacy():
     return render_template('dashboard.html')
